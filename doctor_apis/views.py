@@ -5,6 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 import assemblyai as aai
 from django.contrib.auth import authenticate, login, logout
 import os
+from rest_framework import generics
 from django.contrib import messages
 from rest_framework.views import APIView
 from rest_framework import viewsets, status
@@ -12,7 +13,7 @@ from rest_framework.decorators import api_view, permission_classes,authenticatio
 from rest_framework.response import Response
 from django.core.files.storage import default_storage
 from .models import Profile, Doctor, Patient, Appointment
-from .serializers import UserSerializer, ProfileSerializer,DoctorSerializer, PatientSerializer, AppointmentSerializer
+from .serializers import UserSerializer, ProfileSerializer,DoctorSerializer, PatientSerializer, AppointmentSerializer,AppointmentCreateSerializer
 from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
 # from .forms import UserUpdateForm, ProfileUpdateForm
@@ -26,6 +27,24 @@ from rest_framework.exceptions import PermissionDenied
 aai.settings.api_key = os.getenv('AAI_API_KEY')
 
 
+class UserAppointmentsView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = AppointmentSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.profile.role == 'doctor':
+            # Check if doctor_profile exists
+            if hasattr(user.profile, 'doctor_profile'):
+                return Appointment.objects.filter(doctor=user.profile.doctor_profile)
+            return Appointment.objects.none()
+        elif user.profile.role == 'patient':
+            # Check if patient_profile exists
+            if hasattr(user.profile, 'patient_profile'):
+                return Appointment.objects.filter(patient=user.profile.patient_profile)
+            return Appointment.objects.none()
+        return Appointment.objects.none()
+    
 
 class UserDetailView(APIView):
     def get(self, request, *args, **kwargs):
@@ -46,7 +65,20 @@ def protected_view(request):
     A view that requires the user to be authenticated.
     """
     return Response({'message': 'You have access to this view!'})
+class BookAppointmentView(APIView):
+    permission_classes = [IsAuthenticated]
 
+    def post(self, request, *args, **kwargs):
+        # Ensure the user is a patient
+        if request.user.profile.role != 'patient':
+            return Response({'error': 'Only patients can book appointments.'}, status=status.HTTP_403_FORBIDDEN)
+
+        # Handle the appointment creation
+        serializer = AppointmentCreateSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 class UserUpdateView(APIView):
     def get(self, request, *args, **kwargs):
         # Get the user instance
@@ -175,23 +207,36 @@ class UserUpdateView(APIView):
         }, status=status.HTTP_200_OK)
 # ViewSets for the Doctor, Patient, and Appointment models
 
-class DoctorViewSet(viewsets.ModelViewSet):
+class DoctorViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    ViewSet for doctors allowing only GET requests.
+    """
     queryset = Doctor.objects.all()
     serializer_class = DoctorSerializer
     permission_classes = [IsAuthenticated]
+    http_method_names = ['get']  # Only allow GET requests
 
-class PatientViewSet(viewsets.ModelViewSet):
+class PatientViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    ViewSet for patients allowing only GET requests.
+    """
     queryset = Patient.objects.all()
     serializer_class = PatientSerializer
     permission_classes = [IsAuthenticated]
+    http_method_names = ['get']  # Only allow GET requests
 
-class AppointmentViewSet(viewsets.ModelViewSet):
-    queryset = Patient.objects.all()
+class AppointmentViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    ViewSet for appointments allowing only GET requests for the authenticated user's appointments.
+    """
+    queryset = Appointment.objects.all()
     serializer_class = AppointmentSerializer
     permission_classes = [IsAuthenticated]
+    http_method_names = ['get']  # Only allow GET requests
+
     def get_queryset(self):
         user = self.request.user
-        # Filter appointments based on the user
+        # Filter appointments based on the authenticated user
         return Appointment.objects.filter(user=user)
 
 
