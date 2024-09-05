@@ -36,9 +36,10 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'doctor_apis.apps.DoctorApisConfig', 
     'rest_framework',
     'rest_framework.authtoken',
-    'doctor_apis',
+    # 'doctor_apis',
 ]
 
 MIDDLEWARE = [
@@ -70,6 +71,10 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'doctor_ai.wsgi.application'
+# settings.py
+# AUTH_USER_MODEL = 'doctor_apis.User'
+AUTH_USER_MODEL = 'doctor_apis.User'
+
 
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
