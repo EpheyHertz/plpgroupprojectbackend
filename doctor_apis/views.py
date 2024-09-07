@@ -5,6 +5,15 @@ from rest_framework.permissions import IsAuthenticated
 import assemblyai as aai
 from django.contrib.auth import authenticate, login, logout
 import os
+import io
+import requests
+import asyncio
+import websockets
+import base64
+import json
+import pyaudio
+from django.shortcuts import render
+from django.core.files.uploadedfile import InMemoryUploadedFile
 from rest_framework import generics
 from django.contrib import messages
 from rest_framework.views import APIView
@@ -21,11 +30,14 @@ from rest_framework.authentication import TokenAuthentication
 from django.conf import settings
 from django.urls import reverse_lazy
 from django.views.generic import View
+import google.generativeai as genai
 from rest_framework.exceptions import PermissionDenied
 
 # Configure AssemblyAI API key
-aai.settings.api_key = os.getenv('AAI_API_KEY')
-
+aai.settings.api_key = settings.AAI_APIKEY
+print(aai.settings.api_key)
+GEMINI_AI_API_KEY=settings.GEMINI_AI_API_KEY
+genai.configure(api_key=GEMINI_AI_API_KEY)
 
 class UserAppointmentsView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
@@ -65,20 +77,103 @@ def protected_view(request):
     A view that requires the user to be authenticated.
     """
     return Response({'message': 'You have access to this view!'})
+
 class BookAppointmentView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
         # Ensure the user is a patient
-        if request.user.profile.role != 'patient':
+        if not hasattr(request.user, 'profile') or request.user.profile.role != 'patient':
             return Response({'error': 'Only patients can book appointments.'}, status=status.HTTP_403_FORBIDDEN)
 
         # Handle the appointment creation
         serializer = AppointmentCreateSerializer(data=request.data, context={'request': request})
+
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
+
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+
+class CancelAppointmentView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, appointment_id, *args, **kwargs):
+        try:
+            # Fetch the appointment
+            appointment = Appointment.objects.get(id=appointment_id)
+        except Appointment.DoesNotExist:
+            return Response({'error': 'Appointment not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        user = request.user
+        role = user.profile.role
+
+        # Check if the user is either the patient or the doctor of the appointment
+        if role == 'patient' and appointment.patient != user.profile.patient_profile:
+            return Response({'error': 'You are not authorized to cancel this appointment.'}, status=status.HTTP_403_FORBIDDEN)
+
+        if role == 'doctor' and appointment.doctor != user.profile.doctor_profile:
+            return Response({'error': 'You are not authorized to cancel this appointment.'}, status=status.HTTP_403_FORBIDDEN)
+
+        # Mark the appointment as canceled
+        canceled_by = "doctor" if role == 'doctor' else "patient"
+        appointment.cancel(canceled_by_user=canceled_by)
+
+        # Send email notifications based on who canceled the appointment
+        doctor = appointment.doctor.profile.user
+        patient = appointment.patient.profile.user
+        if role == 'patient':
+            self.notify_cancellation(doctor, patient, canceled_by="patient")
+        elif role == 'doctor':
+            self.notify_cancellation(doctor, patient, canceled_by="doctor")
+
+        return Response({'message': 'Appointment successfully canceled.'}, status=status.HTTP_200_OK)
+
+    def notify_cancellation(self, doctor, patient, canceled_by):
+        if canceled_by == "patient":
+            # Notify the doctor that the patient canceled the appointment
+            send_mail(
+                subject="Appointment Canceled by Patient",
+                message=f"Dear Dr. {doctor.username},\n\n"
+                        f"The appointment with {patient.username} has been canceled by the patient.\n\n"
+                        f"Please reach out if you have any questions.",
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[doctor.email],
+                fail_silently=False,
+            )
+            # Notify the patient that the appointment was successfully canceled
+            send_mail(
+                subject="Appointment Canceled",
+                message=f"Dear {patient.username},\n\n"
+                        f"Your appointment with Dr. {doctor.username} has been successfully canceled.\n\n"
+                        f"If you have any questions, feel free to contact us.",
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[patient.email],
+                fail_silently=False,
+            )
+
+        elif canceled_by == "doctor":
+            # Notify the patient that the doctor canceled the appointment
+            send_mail(
+                subject="Appointment Canceled by Doctor",
+                message=f"Dear {patient.username},\n\n"
+                        f"Your appointment with Dr. {doctor.username} has been canceled by the doctor.\n\n"
+                        f"Please reach out if you have any questions.",
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[patient.email],
+                fail_silently=False,
+            )
+            # Notify the doctor that they successfully canceled the appointment
+            send_mail(
+                subject="Appointment Successfully Canceled",
+                message=f"Dear Dr. {doctor.username},\n\n"
+                        f"You have successfully canceled your appointment with {patient.username}.\n\n"
+                        f"If you have any questions, feel free to contact us.",
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[doctor.email],
+                fail_silently=False,
+            )
 class UserUpdateView(APIView):
     def get(self, request, *args, **kwargs):
         # Get the user instance
@@ -277,73 +372,159 @@ class AppointmentViewSet(viewsets.ReadOnlyModelViewSet):
             raise PermissionDenied("You do not have permission to delete this appointment.")
 
         return super().destroy(request, *args, **kwargs)
-
+def get_assemblyai_client():
+    client = aai.Client(api_key=settings.AAI_KEY)
+    return client
 # View for handling audio file uploads and real-time transcription
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def transcribe_audio(request):
-    """
-    Handle audio file uploads and perform real-time transcription using AssemblyAI.
-    """
-    if 'file' not in request.FILES:
-        return Response({'error': 'No file uploaded'}, status=status.HTTP_400_BAD_REQUEST)
+class Transcribe_audio(APIView):
+    def get(self,request):
+        return render(request,'./transcribe.html')
 
-    audio_file = request.FILES['file']
-    file_path = default_storage.save(audio_file.name, audio_file)
-    full_path = default_storage.path(file_path)
 
-    def on_open(session_opened: aai.RealtimeSessionOpened):
-        """
-        Callback function when the real-time transcription session is opened.
-        """
-        print("Session ID:", session_opened.session_id)
+ 
+import threading
 
-    def on_data(transcript: aai.RealtimeTranscript):
-        """
-        Callback function to handle real-time transcription data.
-        """
-        if not transcript.text:
-            return
-        if isinstance(transcript, aai.RealtimeFinalTranscript):
-            return transcript.text
-        return None
+class TranscribeAudioView(APIView):
+    permission_classes = [IsAuthenticated]
+    aai.settings.api_key = settings.AAI_APIKEY
 
-    def on_error(error: aai.RealtimeError):
+    def post(self, request, *args, **kwargs):
         """
-        Callback function to handle errors during transcription.
+        Handle real-time audio transcription and diagnosis using AssemblyAI for transcription 
+        and Lemur for diagnosis based on symptoms.
         """
-        print("An error occurred:", error)
-        return str(error)
+        transcription_result = []  # Store the transcription as an array of strings.
+        stop_timer = None  # Initialize a timer for stopping the transcription.
+        action = request.data.get('action', 'start')  # Get action from frontend ('start' or 'stop')
 
-    def on_close():
-        """
-        Callback function when the real-time transcription session is closed.
-        """
-        print("Closing Session")
+        prompt = """ 
+        Patient Information:
+        derive it from the real-time transcription.
+        Age: [Patient's Age]
+        Gender: [Patient's Gender]
+        Medical History: [Relevant Medical History]
+        Current Medications: [Current Medications]
+        Known Allergies: [Known Allergies]
+        
+        Transcription of Patient's Symptoms: [Patient's Transcribed Symptoms]
 
-    transcriber = aai.RealtimeTranscriber(
-        sample_rate=16_000,
-        on_data=on_data,
-        on_error=on_error,
-        on_open=on_open,
-        on_close=on_close,
-    )
+        Task:
+        1. Understand the Patient's Condition:
+           - Analyze the provided transcription to understand the patient's symptoms and any mentioned concerns or conditions.
+           - Consider the patient’s age, gender, medical history, current medications, and allergies.
+        
+        2. Measure and Assess the Symptoms:
+           - Identify and list the symptoms described by the patient.
+           - Determine potential diseases or conditions that align with the described symptoms.
+        
+        3. Evaluate the Criticality:
+           - Assess the severity and criticality of the possible conditions based on the symptoms.
+        
+        4. Provide Recommendations:
+           - Suggest general recommendations for the symptoms and conditions identified.
+           - Offer advice on lifestyle changes, over-the-counter treatments, or preliminary self-care measures.
 
-    try:
+        5. Advice on Professional Medical Consultation:
+           - Emphasize the importance of seeing a healthcare professional for a thorough examination and diagnosis.
+           - Suggest that the patient schedule an appointment with a doctor or specialist based on the identified conditions.
+        """
+
+        def stop_transcription():
+            """Function to stop the transcription session."""
+            print("No speech detected. Stopping transcription...")
+            # Call on_close to handle the transcription completion and send it to Gemini AI.
+            on_close()
+
+        def reset_timer():
+            """Reset the stop timer to close the session after 5 seconds of silence."""
+            nonlocal stop_timer
+            if stop_timer:
+                stop_timer.cancel()  # Cancel the previous timer.
+            stop_timer = threading.Timer(15.0, stop_transcription)
+            stop_timer.start()
+
+        def on_open(session_opened: aai.RealtimeSessionOpened):
+            print("Session ID:", session_opened.session_id)
+
+        def on_data(transcript: aai.RealtimeTranscript):
+            if not transcript.text:
+                return
+            if isinstance(transcript, aai.RealtimeFinalTranscript):
+                # Final transcription received, append to the result array.
+                transcription_result.append(transcript.text)
+                print(f"Final Transcript: {transcript.text}", end="\r\n")
+            else:
+                # Interim results, print for real-time feedback.
+                print(f"Interim Transcript: {transcript.text}", end="\r")
+
+            # Reset the timer on receiving any transcript (interim or final)
+            reset_timer()
+
+        def on_error(error: aai.RealtimeError):
+            print("An error occurred:", error)
+            self.error_message = str(error)
+
+        def on_close():
+            print("Closing Session")
+            # When the session closes, send transcription data to Lemur AI for diagnosis.
+            full_transcription = ' '.join(transcription_result)  # Concatenate all results.
+            if full_transcription:
+                # Send the transcription and prompt to Lemur API.
+                gemini_diagnosis = self.get_diagnosis_from_gemini(full_transcription, prompt)
+                print(gemini_diagnosis)
+                return Response({'transcription': full_transcription, 'diagnosis': gemini_diagnosis}, status=status.HTTP_200_OK)
+            else:
+                return Response({'message': 'No transcription available'}, status=status.HTTP_200_OK)
+
+        # Check if the action is 'stop', and if so, call on_close() to finalize and return transcription.
+        if action == 'stop':
+            on_close()
+            return Response({"message":"closed by the user"})
+
+        # If the action is 'start', proceed with starting the transcription session.
+        # Initialize AssemblyAI Transcriber.
+        transcriber = aai.RealtimeTranscriber(
+            sample_rate=16_000,
+            on_data=on_data,
+            on_error=on_error,
+            on_open=on_open,
+            on_close=on_close,
+        )
+        
         transcriber.connect()
-        microphone_stream = aai.extras.MicrophoneStream(sample_rate=16_000)
-        transcriber.stream(microphone_stream)
-        
-        # Process the audio file and get transcription
-        transcription_result = None
-        with open(full_path, 'rb') as f:
-            transcription_result = transcriber.transcribe(f)
-        
-        transcriber.close()
-        return Response({'transcription': transcription_result}, status=status.HTTP_200_OK)
 
-    except Exception as e:
-        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        try:
+            # Start streaming microphone input for transcription.
+            microphone_stream = aai.extras.MicrophoneStream(sample_rate=16_000)
+            transcriber.stream(microphone_stream)
+            
+            # If any error occurs during the session
+            if self.error_message:
+                return Response({'error': self.error_message}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def get_diagnosis_from_gemini(self, transcription, prompt):
+        """
+        Send the transcription to Lemur AI with the provided prompt for medical diagnosis.
+        """ 
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        # Construct a request payload for Lemur AI based on the transcription and prompt.
+        gemini_prompt = prompt.replace("[Patient's Transcribed Symptoms]", transcription)
+        
+        # Assuming the Lemur API endpoint is available and set up properly.
+        gemini_response = model.generate_content(
+            gemini_prompt,
+            generation_config = genai.GenerationConfig(
+                max_output_tokens=1000,
+                temperature=0.1,
+            )
+        )
+        
+        # Process and return Lemur's response.
+        diagnosis =gemini_response.text
+        return diagnosis
 
 class UserSignupView(APIView):
     """
@@ -444,3 +625,10 @@ class UserLogoutView(APIView):
         # Log out the user
         logout(request)
         return Response({'message': 'Logout successful'}, status=status.HTTP_200_OK)
+    
+
+
+# ASSEMBLYAI_API_KEY = settings.ASSEMBLYAI_API_KEY
+# GEMINI_AI_API_KEY = settings.GEMINI_AI_API_KEY
+
+# AssemblyAI WebSocket URL

@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'doctor_apis.apps.DoctorApisConfig', 
     'rest_framework',
+    'channels',
     'rest_framework.authtoken',
     # 'doctor_apis',
 ]
@@ -57,7 +58,7 @@ ROOT_URLCONF = 'doctor_ai.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR, 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -74,6 +75,7 @@ WSGI_APPLICATION = 'doctor_ai.wsgi.application'
 # settings.py
 # AUTH_USER_MODEL = 'doctor_apis.User'
 AUTH_USER_MODEL = 'doctor_apis.User'
+ROOT_URLCONF = 'doctor_ai.urls' 
 
 
 # Database
@@ -84,6 +86,11 @@ DATABASES = {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
     }
+}
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',
+    },
 }
 
 # Password validation
@@ -139,6 +146,8 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 load_dotenv()
 AAI_APIKEY = os.getenv('AAI_API_KEY')
+ASSEMBLYAI_API_KEY = os.getenv('AAI_API_KEY')
+GEMINI_AI_API_KEY = os.getenv('GOOGLE_APIKEY')
 # Email settings for sending emails
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = os.getenv('EMAIL_HOST')

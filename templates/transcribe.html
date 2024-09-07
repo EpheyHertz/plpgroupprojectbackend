@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-time Transcription and Diagnosis</title>
+</head>
+<body>
+    <h1>Real-time Transcription and Diagnosis</h1>
+
+    <!-- Hidden sections for final transcript and diagnosis -->
+    <div id="transcription" style="display: none;">
+        <h2>Final Transcript:</h2>
+        <p id="finalTranscript"></p>
+    </div>
+
+    <div id="diagnosis" style="display: none;">
+        <h2>Diagnosis:</h2>
+        <p id="finalDiagnosis"></p>
+    </div>
+
+    <!-- Button for starting the transcription -->
+    <button id="startBtn">Start Recording</button>
+
+    <script>
+        // Function to get the CSRF token from the cookie
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        const csrfToken = getCookie('csrftoken');
+
+        // Function to display the transcription and diagnosis
+        function displayResults(transcription, diagnosis) {
+            document.getElementById('finalTranscript').innerText = transcription;
+            document.getElementById('finalDiagnosis').innerText = diagnosis;
+            document.getElementById('transcription').style.display = 'block';
+            document.getElementById('diagnosis').style.display = 'block';
+        }
+
+        // Handle the start action
+        document.getElementById('startBtn').addEventListener('click', function() {
+            // Disable the start button
+            document.getElementById('startBtn').disabled = true;
+
+            // Send a POST request to start the transcription
+            fetch('/apis/transcribe/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({ action: 'start' })
+            })
+            .then(response => response.json()) // Fetch response as JSON
+            .then(data => {
+                if (data.transcription && data.diagnosis) {
+                    // Store the transcription and diagnosis in sessionStorage
+                    sessionStorage.setItem('transcription', data.transcription);
+                    sessionStorage.setItem('diagnosis', data.diagnosis);
+
+                    // Display final transcript and diagnosis
+                    displayResults(data.transcription, data.diagnosis);
+                } else {
+                    throw new Error('Failed to retrieve transcription and diagnosis');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('startBtn').disabled = false;
+            });
+        });
+
+        // Check if there is stored data in sessionStorage and display it
+        const savedTranscription = sessionStorage.getItem('transcription');
+        const savedDiagnosis = sessionStorage.getItem('diagnosis');
+
+        if (savedTranscription && savedDiagnosis) {
+            displayResults(savedTranscription, savedDiagnosis);
+        }
+    </script>
+</body>
+</html>
