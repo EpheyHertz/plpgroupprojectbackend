@@ -144,7 +144,7 @@ REST_FRAMEWORK = {
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
-    'https://doctoraimainpage.vercel.app',
+    "https://doctoraimainpage-moygb3h1i-epheys-projects.vercel.app",
         # Frontend local server
       # Your production frontend
 ]
