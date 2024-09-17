@@ -151,7 +151,7 @@ CORS_ALLOWED_ORIGINS = [
 CORS_ALLOW_CREDENTIALS = True
 
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'
-FRONTEND_URL =  'https://doctoraimainpage.vercel.app' 
+FRONTEND_URL =  'https://doctoraimainpage-moygb3h1i-epheys-projects.vercel.app'
 # }
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=5),
