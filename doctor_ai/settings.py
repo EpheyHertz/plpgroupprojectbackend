@@ -26,7 +26,7 @@ SECRET_KEY = 'django-insecure-wdi@o*tr*f$^xab75%9643jyqnf_ee&xt41tsp_7j!@=d9^s7u
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['doctorai.onrender.com','127.0.0.1']
 
 # Application definition
 
@@ -143,13 +143,15 @@ REST_FRAMEWORK = {
 
 
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",  # Frontend local server
+    "http://localhost:3000",
+    'https://doctoraimainpage.vercel.app',
+        # Frontend local server
       # Your production frontend
 ]
 CORS_ALLOW_CREDENTIALS = True
 
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'
-FRONTEND_URL = 'http://localhost:3000'   
+FRONTEND_URL =  'https://doctoraimainpage.vercel.app' 
 # }
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=5),
@@ -206,8 +208,16 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
-STATIC_URL = 'static/'
-
+STATIC_URL = '/static/'
+if not DEBUG:    # Tell Django to copy static assets into a path called `staticfiles` (this is specific to Render)
+    STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+    # Enable the WhiteNoise storage backend, which compresses static files to reduce disk use
+    # and renames the files with unique names for each version to support long-term caching
+    STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+ 
+STATICFILES_DIRS = [  # Additional locations for static files
+    os.path.join(BASE_DIR, 'static'),
+]
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
