@@ -26,7 +26,7 @@ SECRET_KEY = 'django-insecure-wdi@o*tr*f$^xab75%9643jyqnf_ee&xt41tsp_7j!@=d9^s7u
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
 
-ALLOWED_HOSTS = ['doctorai.onrender.com','127.0.0.1']
+ALLOWED_HOSTS = ['doctorai-cw25.onrender.com','127.0.0.1']
 
 # Application definition
 
