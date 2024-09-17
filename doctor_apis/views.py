@@ -56,7 +56,7 @@ class PasswordResetRequestView(APIView):
             # Generate token
             token = default_token_generator.make_token(user)
             # Create reset link
-            reset_link = f" http://doctoraimainpage-moygb3h1i-epheys-projects.vercel.app/auth/password-reset-confirm?token={token}&email={user.email}"
+            reset_link = f" https://doctoraimainpage.vercel.app/auth/password-reset-confirm?token={token}&email={user.email}"
             # Send the email
             send_mail(
                 subject="Password Reset Request",

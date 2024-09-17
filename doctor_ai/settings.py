@@ -58,6 +58,7 @@ SITE_ID = 2
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -145,13 +146,14 @@ REST_FRAMEWORK = {
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "https://doctoraimainpage-moygb3h1i-epheys-projects.vercel.app",
+    "https://doctoraimainpage.vercel.app"
         # Frontend local server
       # Your production frontend
 ]
 CORS_ALLOW_CREDENTIALS = True
 
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'
-FRONTEND_URL =  'https://doctoraimainpage-moygb3h1i-epheys-projects.vercel.app'
+FRONTEND_URL =  'https://doctoraimainpage.vercel.app'
 # }
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=5),
