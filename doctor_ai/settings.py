@@ -24,7 +24,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-wdi@o*tr*f$^xab75%9643jyqnf_ee&xt41tsp_7j!@=d9^s7u'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
 ALLOWED_HOSTS = ['doctorai.onrender.com','127.0.0.1']
 
