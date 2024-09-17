@@ -4,14 +4,7 @@
 from rest_framework.permissions import IsAuthenticated
 import assemblyai as aai
 from django.contrib.auth import authenticate, login, logout
-import os
-import io
-import requests
-import asyncio
-import websockets
-import base64
-import json
-import pyaudio
+
 import requests
 from django.shortcuts import render
 from django.core.files.uploadedfile import InMemoryUploadedFile
