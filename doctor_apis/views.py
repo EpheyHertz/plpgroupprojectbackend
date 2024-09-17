@@ -50,6 +50,50 @@ from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.tokens import RefreshToken
+from django.contrib.auth.tokens import default_token_generator
+
+class PasswordResetRequestView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        email = request.data.get('email')
+        try:
+            # Find user by email
+            user = User.objects.get(email=email)
+            # Generate token
+            token = default_token_generator.make_token(user)
+            # Create reset link
+            reset_link = f"http://localhost:3000/auth/password-reset-confirm?token={token}&email={user.email}"
+            # Send the email
+            send_mail(
+                subject="Password Reset Request",
+                message=f"Click the following link to reset your password: {reset_link}",
+                from_email=settings.DEFAULT_FROM_EMAIL,  # Use the sender email
+                recipient_list=[user.email],
+                fail_silently=False,  # Make this False to get feedback on failures
+            )
+            return Response({'message': 'Password reset link has been sent to your email.'}, status=status.HTTP_200_OK)
+        except User.DoesNotExist:
+            return Response({'error': 'User with this email does not exist.'}, status=status.HTTP_400_BAD_REQUEST)
+
+class PasswordResetConfirmView(APIView):
+    permission_classes=[AllowAny]
+    def post(self, request):
+        token = request.data.get('token')
+        email = request.data.get('email')
+        new_password = request.data.get('new_password')
+        
+        try:
+            user = User.objects.get(email=email)
+            if default_token_generator.check_token(user, token):
+                user.set_password(new_password)
+                user.save()
+                return Response({'message': 'Password has been reset successfully.'}, status=status.HTTP_200_OK)
+            else:
+                return Response({'error': 'Invalid token.'}, status=status.HTTP_400_BAD_REQUEST)
+        except User.DoesNotExist:
+            return Response({'error': 'Invalid user.'}, status=status.HTTP_400_BAD_REQUEST)
+
 # from google.oauth2 import id_token
 # import requests as req
 # from google.auth.transport import requests
