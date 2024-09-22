@@ -95,13 +95,25 @@ ROOT_URLCONF = 'doctor_ai.urls'
 
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
+load_dotenv()
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': os.getenv('MYSQL_DATABASE'),
+        'USER': os.getenv('MYSQL_USER'),
+        'PASSWORD': os.getenv('MYSQL_PASSWORD'),
+        'HOST': os.getenv('MYSQL_HOST'),
+        'PORT': os.getenv('MYSQL_PORT'),
     }
 }
+
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': BASE_DIR / 'db.sqlite3',
+#     }
+# }
 CHANNEL_LAYERS = {
     'default': {
         'BACKEND': 'channels.layers.InMemoryChannelLayer',
@@ -146,7 +158,8 @@ REST_FRAMEWORK = {
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "https://doctoraimainpage-moygb3h1i-epheys-projects.vercel.app",
-    "https://doctoraimainpage.vercel.app"
+    "https://doctoraimainpage.vercel.app",
+    "https://doctorai-looking-forward-to-betterhealthcare.vercel.app"
         # Frontend local server
       # Your production frontend
 ]
