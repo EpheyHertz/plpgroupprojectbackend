@@ -87,53 +87,7 @@ class PasswordResetConfirmView(APIView):
         except User.DoesNotExist:
             return Response({'error': 'Invalid user.'}, status=status.HTTP_400_BAD_REQUEST)
 
-# from google.oauth2 import id_token
-# import requests as req
-# from google.auth.transport import requests
-# class GoogleLogin(APIView):
-#     permission_classes = [AllowAny]
 
-#     def post(self, request, *args, **kwargs):
-#         print(request.data)
-#         access_token = request.data.get('access_token')
-#         id_token = request.data.get('id_token')
-#         code = request.data.get('code')
-
-#         if not access_token or not id_token or not code:
-#             return Response({"status": "error", "message": "Missing tokens"}, status=400)
-
-#         # Verify ID token
-#         client_id = settings.OAUTH_CLIENT_ID  # Replace with your client ID
-#         idinfo = self.verify_id_token(id_token, client_id)
-#         if not idinfo:
-#             return Response({"status": "error", "message": "Invalid ID token"}, status=400)
-
-#         # Verify Access token (Optional)
-#         token_info = self.verify_access_token(access_token)
-#         if not token_info:
-#             return Response({"status": "error", "message": "Invalid access token"}, status=400)
-
-#         # Process the tokens
-#         # For example, you might want to associate the user with your application
-
-#         return Response({"status": "success", "message": "Tokens received"}, status=200)
-
-#     def verify_id_token(self, id_token, client_id):
-#         try:
-#             idinfo = id_token.verify_oauth2_token(id_token, requests.Request(), client_id)
-#             return idinfo
-#         except ValueError:
-#             return None
-
-#     def verify_access_token(self, access_token):
-#         try:
-#             response = req.get('https://www.googleapis.com/oauth2/v1/tokeninfo', params={'access_token': access_token})
-#             if response.status_code == 200:
-#                 return response.json()
-#             else:
-#                 return None
-#         except req.RequestException:
-#             return None
 class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
     @classmethod
     def validate(cls, attrs):
