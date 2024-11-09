@@ -1,6 +1,4 @@
-# doctor_apis/views.py
-# from django.contrib.auth.models import User
-# from .models import User,Chat, ChatMessage
+
 from rest_framework.permissions import IsAuthenticated
 import assemblyai as aai
 from django.contrib.auth import authenticate, login, logout
@@ -32,9 +30,7 @@ from django.db import IntegrityError
 import logging
 
 logger = logging.getLogger(__name__)
-# ?\from dj_rest_auth.registration.views import SocialLoginView
-# from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
-# Configure AssemblyAI API key
+
 aai.settings.api_key = settings.AAI_APIKEY
 print(aai.settings.api_key)
 GEMINI_AI_API_KEY=settings.GEMINI_AI_API_KEY
